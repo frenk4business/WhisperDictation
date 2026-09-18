@@ -634,7 +634,9 @@ private struct ModelSection: View {
                 Spacer()
 
                 if isDownloaded {
-                    if !isSelected {
+                    // A selected model can still be unloaded (for example, it was
+                    // downloaded after switching language). Keep activation available.
+                    if !isSelected || !engine.isModelLoaded {
                         Button("Activate") {
                             settings.selectedModel = model.settingsId
                             engine.reloadModel()

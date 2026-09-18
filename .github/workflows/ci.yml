@@ -43,11 +43,30 @@ jobs:
           test -s build/WhisperDictation.app/Contents/Resources/en.lproj/Localizable.strings
           test -s build/WhisperDictation.app/Contents/Resources/nl.lproj/Localizable.strings
 
-      - name: Upload artifact
+      - name: Package and verify test DMG
+        run: |
+          ./scripts/create-dmg.sh
+          hdiutil verify build/WhisperDictation.dmg
+          DMG_MOUNT=$(mktemp -d)
+          trap 'hdiutil detach "$DMG_MOUNT" >/dev/null 2>&1 || true; rmdir "$DMG_MOUNT" 2>/dev/null || true' EXIT
+          hdiutil attach -nobrowse -readonly -mountpoint "$DMG_MOUNT" build/WhisperDictation.dmg
+          test -x "$DMG_MOUNT/WhisperDictation.app/Contents/MacOS/WhisperDictation"
+          codesign --verify --deep --strict "$DMG_MOUNT/WhisperDictation.app"
+          test -s "$DMG_MOUNT/WhisperDictation.app/Contents/Resources/nl.lproj/Localizable.strings"
+          test -L "$DMG_MOUNT/Applications"
+          cp TESTEN.nl.md build/LEESMIJ-testversie.md
+          cd build
+          shasum -a 256 WhisperDictation.dmg > WhisperDictation.dmg.sha256
+
+      - name: Upload test installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: WhisperDictation.app
-          path: build/WhisperDictation.app
+          name: WhisperDictation-Dutch-test-macOS
+          if-no-files-found: error
+          path: |
+            build/WhisperDictation.dmg
+            build/WhisperDictation.dmg.sha256
+            build/LEESMIJ-testversie.md
 
   test:
     runs-on: macos-15

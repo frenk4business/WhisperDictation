@@ -2,7 +2,9 @@
 
 Ontwikkelfork van [sam-pop/WhisperDictation](https://github.com/sam-pop/WhisperDictation),
 met behoud van de oorspronkelijke MIT-licentie en copyrightvermelding.
-De Nederlandse uitbreiding is **nog niet vrijgegeven of op een echte Mac gevalideerd**.
+De Nederlandse uitbreiding is **nog niet stabiel vrijgegeven of met echte dictatie gevalideerd**.
+De universele macOS-build, 149 Swift-tests en 7 toolingtests zijn geslaagd.
+Een DMG voor praktijktests wordt bij elke CI-build gemaakt: zie [testinstructies](TESTEN.nl.md).
 Zie [DEVELOPMENT.md](DEVELOPMENT.md) en [concept-PR #1](https://github.com/frenk4business/WhisperDictation/pull/1).
 
 ## Wat is toegevoegd?
@@ -75,5 +77,5 @@ migratie. Installeer/draai de originele en aangepaste app niet tegelijk.
 Er zijn [55 voorleeszinnen en een testprotocol](evaluation/nl/README.md), maar
 nog geen opnamen, WER-scores of snelheidsmetingen. Publiceer geen privéopnamen
 in deze openbare repository. De releaseworkflow maakt alleen een **concept-prerelease**.
-Er is geen tag gemaakt en geen DMG gepubliceerd. Eerst macOS CI, daarna echte
-dicteer- en invoegtests, daarna pas vrijgave.
+Er is geen tag of release gepubliceerd. CI levert wel een DMG-testpakket met
+checksum. Echte dicteer- en invoegtests zijn nodig vóór vrijgave.

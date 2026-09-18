@@ -10,7 +10,7 @@ This fork preserves the MIT license and attribution to Sam Pop. Work takes place
 - [x] Conservative Dutch correction and opt-in spoken punctuation implemented
 - [x] Dutch interface/catalog and onboarding implemented (visual inspection pending)
 - [x] Automated Dutch regression tests added; existing English golden tests retained
-- [ ] Execute macOS XCTest and verify universal application build
+- [x] Execute macOS XCTest and verify universal application build (149 tests, 0 failures)
 - [x] 55 Dutch audio evaluation prompts and scoring script
 - [ ] Real audio recordings, accuracy and latency measurements
 - [ ] Manual Mac tests: TextEdit, Chrome, Slack, ChatGPT, PyCharm, Mail
@@ -26,9 +26,11 @@ The editing environment is Linux, not macOS. A CI build does not verify micropho
 - `git diff --check`: passed.
 - A non-compiler Swift syntax scan found only the same five parser limitations
   present in upstream `Settings.swift`; it is **not** a Swift typecheck or build.
-- GitHub Actions returned no registered workflows/runs at initial validation.
-  Visit the fork's Actions tab and enable workflows if GitHub offers that button.
-  CI supports push/PR and manual runs once enabled. No baseline pass is claimed.
+- After Actions was enabled, [PR run 35333165793](https://github.com/frenk4business/WhisperDictation/actions/runs/35333165793)
+  passed build, test and tooling on commit `b8ddf63`: x86_64 + arm64 app,
+  149 XCTest tests (including 11 Dutch tests), 7 tooling tests, 126 localized strings.
+  No separate upstream baseline pass is claimed. The existing upstream CFString
+  pointer compiler warning in AudioDeviceManager remains.
 
 ## Architecture and remaining limitations
 
@@ -43,6 +45,10 @@ VAD fragment. Multiword commands/numbers split across separate live pauses still
 need a pending-tail buffer. Full-precision multilingual variants were optional
 in the plan and are not added; existing English full-precision models remain.
 
-No GitHub Projects board, signed/notarized app, tag, DMG or published release has
-been created. Track implementation in PR #1 and this checklist; do not mark the
-audio/manual/release gates complete until evidence is attached.
+CI now packages an ad-hoc-signed DMG test artifact and SHA-256 checksum, verifies
+the image and its mounted executable, signature and Dutch localization. This
+supports manual evaluation; it is not a published prerelease.
+
+No GitHub Projects board, Developer-ID-signed/notarized app, tag or published
+release has been created. Track implementation in PR #1 and this checklist;
+do not mark audio/manual/release gates complete until evidence is attached.
