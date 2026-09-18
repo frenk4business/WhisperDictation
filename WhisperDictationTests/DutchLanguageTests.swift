@@ -110,7 +110,8 @@ final class DutchLanguageTests: XCTestCase {
         XCTAssertEqual(DutchTextCorrector.correct("hallo punt. nieuwe regel. volgende zin", commands: true), "Hallo.\nVolgende zin.")
         XCTAssertEqual(DutchTextCorrector.correct("titel dubbele punt nieuwe alinea tekst", commands: true), "Titel:\n\nTekst.")
         XCTAssertEqual(DutchTextCorrector.correct("hallo vraagteken", grammar: false, commands: true), "hallo?")
-        XCTAssertEqual(DutchTextCorrector.correct("twee , drie", grammar: false), "twee , drie")
+        XCTAssertEqual(DutchTextCorrector.correct("twee , drie", grammar: false, numbers: false), "twee , drie")
+        XCTAssertEqual(DutchTextCorrector.correct("twee dingen", grammar: false, numbers: true), "2 dingen")
         XCTAssertEqual(DutchTextCorrector.correct("twee dingen", numbers: false), "Twee dingen.")
     }
 

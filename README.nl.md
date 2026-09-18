@@ -58,19 +58,32 @@ migratie. Installeer/draai de originele en aangepaste app niet tegelijk.
 
 ## Grenzen van deze eerste implementatie
 
-- De corrector herschrijft geen grammatica of betekenis. `een` blijft een lidwoord;
-  `één` kan een cijfer worden. Datums, tijden, losse telreeksen, telefoonnummers en
-  alle mogelijke losse getalwoordcombinaties worden niet intelligent geïnterpreteerd.
-- Samengestelde gehele getallen worden herkend tot 999.999. De decimale regel
-  ondersteunt één getal na ‘komma’; spreek bijvoorbeeld ‘drie komma vijf’.
-- Technische termen helpen de herkenning, maar garanderen geen foutloze vaktaal.
-- Automatisch bepaalt de taal per opname/live-fragment, niet per woord.
-  Voor overwegend Nederlandse technische zinnen is Nederlands het uitgangspunt.
-- Gewone NL/Auto-dictatie typt na de volledige decode. Live dicteren typt per
-  VAD-fragment. Spreek getallen en commando's zonder lange tussentijdse pauze:
-  correctie over twee afzonderlijke live-fragmenten is nog niet geïmplementeerd.
-- Regeleinden zijn Unicode-tekst, geen verzendsneltoets. Het gedrag verschilt per
-  app: test eerst in concepten, vooral in chatapps en terminals.
+- De Nederlandse herkenningskwaliteit en snelheid zijn nog niet gemeten met echte
+  opnamen. De geautomatiseerde tests controleren codegedrag, niet accenten,
+  achtergrondgeluid, microfoonkwaliteit of Whisper-fouten.
+- Gewone NL/Auto-dictatie typt pas na de volledige decode. Als de focus of cursor
+  intussen verandert, kan tekst op de verkeerde plek terechtkomen. Live dicteren
+  verlaagt die wachttijd, maar werkt per VAD-fragment.
+- Automatisch bepaalt één taal per opname of live-fragment, niet per woord. Een zin
+  met veel Nederlands én Engels kan daardoor de verkeerde correctielaag krijgen;
+  korte fragmenten zijn extra lastig te detecteren.
+- De corrector herschrijft geen grammatica, spelling of betekenis. Hij verzorgt
+  hoofdletters, spaties, enkele vaste termen en beperkte getalconversie.
+- Getalconversie herkent vooral aaneengeschreven vormen tot 999.999 en eenvoudige
+  decimalen zoals ‘drie komma vijf’. `een` blijft conservatief een lidwoord. Datums,
+  tijden, valuta, percentages, telefoonnummers, reeksen en vrije combinaties van
+  losse getalwoorden hebben geen semantische parser.
+- Gesproken commando's zijn contextongevoelig en daarom standaard uit. Met de optie
+  aan wordt bijvoorbeeld elk los woord ‘punt’ een leesteken. Een commando of getal
+  dat door een live-VAD-pauze over twee fragmenten valt, wordt niet samengevoegd.
+- Technische termen en de eigen woordenlijst sturen Whisper en herstellen casing,
+  maar garanderen geen juiste herkenning van productnamen of gemengde vaktaal.
+- Tekstinvoer gebruikt macOS Accessibility en Unicode-toetsaanslagen. Regeleinden
+  zijn geen verzendsneltoets; beveiligde velden en sommige apps kunnen invoer
+  blokkeren of anders verwerken. Test vooral chatapps en terminals eerst in concepten.
+- De testbuild is ad-hoc ondertekend en niet door Apple genotariseerd. De fork deelt
+  momenteel bundle-ID, instellingen en modellenmap met de originele app; installeer
+  of draai beide varianten niet tegelijk.
 
 ## Testen en vrijgeven
 

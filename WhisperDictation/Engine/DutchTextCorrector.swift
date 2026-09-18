@@ -35,9 +35,9 @@ enum DutchTextCorrector {
     static func correct(_ text: String, grammar: Bool = true, numbers: Bool = true,
                         commands: Bool = false, style: DutchNumberStyle = .plain,
                         customTerms: [String] = [], context: CorrectionContext = .standalone) -> String {
-        guard grammar || commands else { return text }
+        guard grammar || numbers || commands else { return text }
         var result = text
-        if grammar && numbers {
+        if numbers {
             result = replace(result, pattern: #"\b[\p{L}]+\b"#) { word in
                 // An unaccented "een" is usually the article, not a numeric instruction.
                 guard word.lowercased() != "een", let value = integer(word) else { return word }
@@ -62,12 +62,14 @@ enum DutchTextCorrector {
                 result = replace(result, pattern: "\\b" + spoken.replacingOccurrences(of: " ", with: "\\h+") + "\\b[.,]?") { _ in symbol }
             }
         }
-        // Horizontal space only: never collapse spoken line/paragraph boundaries.
-        result = replace(result, pattern: #"\h+([,.;:!?])"#) { $0.trimmingCharacters(in: .whitespaces) }
-        result = replace(result, pattern: #"[,;:!?](?=\p{L})"#) { $0 + " " }
-        result = result.replacingOccurrences(of: #"\h*\n\h*"#, with: "\n", options: .regularExpression)
-        result = replace(result, pattern: #"\h{2,}"#) { _ in " " }
-        result = result.trimmingCharacters(in: .whitespaces)
+        if grammar || commands {
+            // Horizontal space only: never collapse spoken line/paragraph boundaries.
+            result = replace(result, pattern: #"\h+([,.;:!?])"#) { $0.trimmingCharacters(in: .whitespaces) }
+            result = replace(result, pattern: #"[,;:!?](?=\p{L})"#) { $0 + " " }
+            result = result.replacingOccurrences(of: #"\h*\n\h*"#, with: "\n", options: .regularExpression)
+            result = replace(result, pattern: #"\h{2,}"#) { _ in " " }
+            result = result.trimmingCharacters(in: .whitespaces)
+        }
         if grammar {
             // Only genuine sentence boundaries, not periods within URLs/acronyms/decimals.
             if context.atSentenceStart {
