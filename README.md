@@ -1,3 +1,8 @@
+> **Dutch-support development fork:** see [Nederlandse handleiding](README.nl.md)
+> and [validation status](DEVELOPMENT.md). Work is on `feature/dutch-language-support`.
+> The upstream download links below do **not** include this Dutch extension.
+> No Dutch DMG or verified audio-quality results have been released yet.
+
 <p align="center">
   <h1 align="center">WhisperDictation</h1>
   <p align="center">

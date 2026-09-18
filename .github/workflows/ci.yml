@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/dutch-language-support]
   pull_request:
     branches: [main]
 
@@ -36,6 +37,11 @@ jobs:
 
       - name: Build app
         run: make app
+
+      - name: Verify bundled localizations
+        run: |
+          test -s build/WhisperDictation.app/Contents/Resources/en.lproj/Localizable.strings
+          test -s build/WhisperDictation.app/Contents/Resources/nl.lproj/Localizable.strings
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -76,4 +82,17 @@ jobs:
         run: xcodegen generate
 
       - name: Run tests
-        run: xcodebuild test -project WhisperDictation.xcodeproj -scheme WhisperDictation -destination "platform=macOS"
+        run: xcodebuild test -project WhisperDictation.xcodeproj -scheme WhisperDictation -destination "platform=macOS" -resultBundlePath build/TestResults.xcresult
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: TestResults
+          path: build/TestResults.xcresult
+
+  tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - run: python3 -m unittest discover -s scripts/tests -v

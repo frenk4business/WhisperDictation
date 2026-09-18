@@ -108,7 +108,7 @@ final class AppSettingsTests: XCTestCase {
 
         // Unknown id → default
         UserDefaults.standard.set("totally-bogus-model-xyz", forKey: key)
-        XCTAssertEqual(AppSettings.shared.selectedModel, "small.en")
+        XCTAssertEqual(AppSettings.shared.selectedModel, AppSettings.shared.speechLanguage.defaultModelID)
 
         // Known catalog id → preserved
         UserDefaults.standard.set("base.en", forKey: key)
@@ -137,7 +137,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(prompt.isEmpty)
         XCTAssertTrue(prompt.contains("API"))
         XCTAssertTrue(prompt.contains("JSON"))
-        XCTAssertTrue(prompt.contains("SwiftUI"))
+        XCTAssertFalse(AppSettings.shared.speechLanguage.defaultPrompt.isEmpty)
     }
 
     func testDefaultVocabularyPrompt() {
@@ -204,11 +204,11 @@ final class DictationStateTests: XCTestCase {
 
 final class ModelManagerTests: XCTestCase {
     func testModelInfoCount() {
-        XCTAssertEqual(ModelManager.ModelInfo.all.count, 6)
+        XCTAssertEqual(ModelManager.ModelInfo.all.count, 9)
     }
 
     func testRecommendedModelsCount() {
-        XCTAssertEqual(ModelManager.ModelInfo.recommended.count, 3)
+        XCTAssertEqual(ModelManager.ModelInfo.recommended.count, 6)
     }
 
     func testQuantizedModelsAreRecommended() {
@@ -799,11 +799,13 @@ final class OnboardingTests: XCTestCase {
 // MARK: - AudioDeviceManager Tests
 
 final class AudioDeviceManagerTests: XCTestCase {
-    func testListDevices() {
+    func testListDevices() throws {
         let manager = AudioDeviceManager.shared
         manager.refreshDevices()
-        // Should have at least one input device on any Mac
-        XCTAssertFalse(manager.inputDevices.isEmpty, "No audio input devices found")
+        // Hosted runners may have no audio hardware. Record an explicit skip,
+        // never pretend that physical microphone capture has been tested.
+        try XCTSkipIf(manager.inputDevices.isEmpty, "No audio input hardware on this runner")
+        XCTAssertEqual(Set(manager.inputDevices.map(\.uid)).count, manager.inputDevices.count)
     }
 
     func testSelectedDeviceHandled() {

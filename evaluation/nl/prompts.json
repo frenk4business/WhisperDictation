@@ -1,0 +1,332 @@
+[
+  {
+    "id": "nl001",
+    "category": "dagelijks",
+    "read_aloud": "Goedemorgen, ik ben onderweg naar kantoor.",
+    "commands": false
+  },
+  {
+    "id": "nl002",
+    "category": "dagelijks",
+    "read_aloud": "Kun je mij morgen even terugbellen?",
+    "commands": false
+  },
+  {
+    "id": "nl003",
+    "category": "dagelijks",
+    "read_aloud": "Ik stuur je straks een bericht met de planning.",
+    "commands": false
+  },
+  {
+    "id": "nl004",
+    "category": "dagelijks",
+    "read_aloud": "Er staat een kop koffie op tafel.",
+    "commands": false
+  },
+  {
+    "id": "nl005",
+    "category": "dagelijks",
+    "read_aloud": "We spreken elkaar na de lunch.",
+    "commands": false
+  },
+  {
+    "id": "nl006",
+    "category": "dagelijks",
+    "read_aloud": "Het café in België is vandaag gesloten.",
+    "commands": false
+  },
+  {
+    "id": "nl007",
+    "category": "dagelijks",
+    "read_aloud": "Mijn ideeën staan in het gedeelde document.",
+    "commands": false
+  },
+  {
+    "id": "nl008",
+    "category": "dagelijks",
+    "read_aloud": "Volgens mij kunnen we dit vrijdag afronden.",
+    "commands": false
+  },
+  {
+    "id": "nl009",
+    "category": "dagelijks",
+    "read_aloud": "Bedankt voor je hulp bij dit project.",
+    "commands": false
+  },
+  {
+    "id": "nl010",
+    "category": "dagelijks",
+    "read_aloud": "Ik wil een punt maken over de planning.",
+    "commands": false
+  },
+  {
+    "id": "nl011",
+    "category": "technisch",
+    "read_aloud": "Kun je in het Grafana dashboard de Plant Activity prediction aanpassen en daarna een Slack message sturen?",
+    "commands": false
+  },
+  {
+    "id": "nl012",
+    "category": "technisch",
+    "read_aloud": "De API geeft JSON terug aan de frontend.",
+    "commands": false
+  },
+  {
+    "id": "nl013",
+    "category": "technisch",
+    "read_aloud": "Ik heb de wijzigingen naar GitHub gepusht.",
+    "commands": false
+  },
+  {
+    "id": "nl014",
+    "category": "technisch",
+    "read_aloud": "OpenAI en ChatGPT gebruiken we voor deze proef.",
+    "commands": false
+  },
+  {
+    "id": "nl015",
+    "category": "technisch",
+    "read_aloud": "Het Python script schrijft de resultaten naar PostgreSQL.",
+    "commands": false
+  },
+  {
+    "id": "nl016",
+    "category": "technisch",
+    "read_aloud": "De nieuwe versie werkt op macOS.",
+    "commands": false
+  },
+  {
+    "id": "nl017",
+    "category": "technisch",
+    "read_aloud": "Kun je de pull request reviewen voordat we deployen?",
+    "commands": false
+  },
+  {
+    "id": "nl018",
+    "category": "technisch",
+    "read_aloud": "Er zit een fout in de authentication middleware.",
+    "commands": false
+  },
+  {
+    "id": "nl019",
+    "category": "technisch",
+    "read_aloud": "De database migration moet eerst op staging draaien.",
+    "commands": false
+  },
+  {
+    "id": "nl020",
+    "category": "technisch",
+    "read_aloud": "Stuur de logs naar Slack en controleer de Grafana alerts.",
+    "commands": false
+  },
+  {
+    "id": "nl021",
+    "category": "getallen",
+    "read_aloud": "Er zijn tweeënveertig nieuwe berichten.",
+    "commands": false
+  },
+  {
+    "id": "nl022",
+    "category": "getallen",
+    "read_aloud": "De temperatuur is drie komma vijf graden.",
+    "commands": false
+  },
+  {
+    "id": "nl023",
+    "category": "getallen",
+    "read_aloud": "Het budget is vijfduizend euro.",
+    "commands": false
+  },
+  {
+    "id": "nl024",
+    "category": "getallen",
+    "read_aloud": "Ik heb één vraag over een bestand.",
+    "commands": false
+  },
+  {
+    "id": "nl025",
+    "category": "getallen",
+    "read_aloud": "De bestelling bevat honderdtwee artikelen.",
+    "commands": false
+  },
+  {
+    "id": "nl026",
+    "category": "getallen",
+    "read_aloud": "Mijn code begint met nul nul zeven.",
+    "commands": false
+  },
+  {
+    "id": "nl027",
+    "category": "getallen",
+    "read_aloud": "We verzamelen drieënzeventig metingen.",
+    "commands": false
+  },
+  {
+    "id": "nl028",
+    "category": "getallen",
+    "read_aloud": "De vergadering begint om half drie.",
+    "commands": false
+  },
+  {
+    "id": "nl029",
+    "category": "getallen",
+    "read_aloud": "De afspraak is op twaalf oktober.",
+    "commands": false
+  },
+  {
+    "id": "nl030",
+    "category": "getallen",
+    "read_aloud": "Het bedrag is negentien euro en vijftig cent.",
+    "commands": false
+  },
+  {
+    "id": "nl031",
+    "category": "lange_berichten",
+    "read_aloud": "Kun je eerst de foutmeldingen controleren, daarna de resultaten vergelijken en mij laten weten of we morgen veilig kunnen starten?",
+    "commands": false
+  },
+  {
+    "id": "nl032",
+    "category": "lange_berichten",
+    "read_aloud": "Ik heb het dashboard bekeken en volgens mij ontbreken de gegevens van gisteren, terwijl de database wel alle metingen bevat.",
+    "commands": false
+  },
+  {
+    "id": "nl033",
+    "category": "lange_berichten",
+    "read_aloud": "Laten we de release nog even uitstellen totdat de tests klaar zijn en iedereen de nieuwe instellingen heeft gecontroleerd.",
+    "commands": false
+  },
+  {
+    "id": "nl034",
+    "category": "lange_berichten",
+    "read_aloud": "We moeten dit zorgvuldig bespreken, want de wijziging raakt zowel de planning als de manier waarop klanten hun rapporten ontvangen.",
+    "commands": false
+  },
+  {
+    "id": "nl035",
+    "category": "lange_berichten",
+    "read_aloud": "Als je straks tijd hebt, wil ik graag samen de pull request doornemen en controleren of de bestaande Engelse instellingen behouden blijven.",
+    "commands": false
+  },
+  {
+    "id": "nl036",
+    "category": "vragen_en_interpunctie",
+    "read_aloud": "Waarom staat deze melding nog in beeld?",
+    "commands": false
+  },
+  {
+    "id": "nl037",
+    "category": "vragen_en_interpunctie",
+    "read_aloud": "Is de microfoon nu goed ingesteld?",
+    "commands": false
+  },
+  {
+    "id": "nl038",
+    "category": "vragen_en_interpunctie",
+    "read_aloud": "Dit is belangrijk: bewaar altijd het originele bestand.",
+    "commands": false
+  },
+  {
+    "id": "nl039",
+    "category": "vragen_en_interpunctie",
+    "read_aloud": "Wat een mooi resultaat!",
+    "commands": false
+  },
+  {
+    "id": "nl040",
+    "category": "vragen_en_interpunctie",
+    "read_aloud": "Zullen we verdergaan, of wil je eerst pauzeren?",
+    "commands": false
+  },
+  {
+    "id": "nl041",
+    "category": "korte_fragmenten",
+    "read_aloud": "Ja.",
+    "commands": false
+  },
+  {
+    "id": "nl042",
+    "category": "korte_fragmenten",
+    "read_aloud": "Nee, bedankt.",
+    "commands": false
+  },
+  {
+    "id": "nl043",
+    "category": "korte_fragmenten",
+    "read_aloud": "Nog een keer.",
+    "commands": false
+  },
+  {
+    "id": "nl044",
+    "category": "korte_fragmenten",
+    "read_aloud": "Dat klopt.",
+    "commands": false
+  },
+  {
+    "id": "nl045",
+    "category": "korte_fragmenten",
+    "read_aloud": "Tot morgen.",
+    "commands": false
+  },
+  {
+    "id": "nl046",
+    "category": "codewisseling",
+    "read_aloud": "De deployment is klaar, maar de health check geeft nog een warning.",
+    "commands": false
+  },
+  {
+    "id": "nl047",
+    "category": "codewisseling",
+    "read_aloud": "Kun je de meeting verplaatsen naar morgen?",
+    "commands": false
+  },
+  {
+    "id": "nl048",
+    "category": "codewisseling",
+    "read_aloud": "We need to check the logs. Daarna bespreken we de resultaten.",
+    "commands": false
+  },
+  {
+    "id": "nl049",
+    "category": "codewisseling",
+    "read_aloud": "The API is ready. Kun je nu de Nederlandse interface testen?",
+    "commands": false
+  },
+  {
+    "id": "nl050",
+    "category": "codewisseling",
+    "read_aloud": "Please review the pull request. Ik pak ondertussen de database migration op.",
+    "commands": false
+  },
+  {
+    "id": "nl051",
+    "category": "commando_opt_in",
+    "read_aloud": "hallo punt nieuwe regel volgende zin",
+    "commands": true
+  },
+  {
+    "id": "nl052",
+    "category": "commando_opt_in",
+    "read_aloud": "titel dubbele punt nieuwe alinea hier begint de tekst",
+    "commands": true
+  },
+  {
+    "id": "nl053",
+    "category": "commando_opt_in",
+    "read_aloud": "werkt dit vraagteken",
+    "commands": true
+  },
+  {
+    "id": "nl054",
+    "category": "commando_opt_in",
+    "read_aloud": "let op uitroepteken",
+    "commands": true
+  },
+  {
+    "id": "nl055",
+    "category": "commando_opt_in",
+    "read_aloud": "rood komma groen komma blauw",
+    "commands": true
+  }
+]

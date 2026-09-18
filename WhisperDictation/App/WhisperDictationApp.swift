@@ -3,10 +3,12 @@ import SwiftUI
 @main
 struct WhisperDictationApp: App {
     @State private var engine = DictationEngine()
+    @ObservedObject private var settings = AppSettings.shared
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(engine: engine)
+                .environment(\.locale, Locale(identifier: settings.interfaceLanguage.rawValue))
         } label: {
             // The label renders at launch (it's the menu bar icon), so it's a reliable
             // place to trigger first-launch onboarding for an LSUIElement app that has
@@ -15,14 +17,16 @@ struct WhisperDictationApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("WhisperDictation Settings", id: "settings") {
+        Window(LocalizedStringKey(L10n.text("WhisperDictation Settings")), id: "settings") {
             SettingsView(engine: engine)
+                .environment(\.locale, Locale(identifier: settings.interfaceLanguage.rawValue))
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
-        Window("Welcome to WhisperDictation", id: "onboarding") {
+        Window(LocalizedStringKey(L10n.text("Welcome to WhisperDictation")), id: "onboarding") {
             OnboardingView(engine: engine)
+                .environment(\.locale, Locale(identifier: settings.interfaceLanguage.rawValue))
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)

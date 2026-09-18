@@ -9,6 +9,7 @@ struct OnboardingView: View {
     let engine: DictationEngine
     @ObservedObject private var permissions = PermissionManager.shared
     @ObservedObject private var modelManager = ModelManager.shared
+    @ObservedObject private var settings = AppSettings.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
@@ -16,7 +17,9 @@ struct OnboardingView: View {
 
     /// The tier we recommend to new users: same "Balanced" quantized model SettingsView
     /// promotes — small footprint (181 MB), near-full accuracy.
-    private let recommendedModel = ModelManager.ModelInfo.smallEnQ5
+    private var recommendedModel: ModelManager.ModelInfo {
+        settings.speechLanguage == .english ? .smallEnQ5 : .smallQ5
+    }
 
     /// Auto-refresh permissions while onboarding is visible so granting Accessibility
     /// in System Settings (which can't be requested in-process) reflects without a manual tap.
@@ -114,6 +117,15 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            Picker("Speech language", selection: $settings.speechLanguage) {
+                ForEach(SpeechLanguage.allCases) { language in
+                    Text(LocalizedStringKey(language.title)).tag(language)
+                }
+            }
+            .onChange(of: settings.speechLanguage) { _, language in
+                settings.interfaceLanguage = language == .english ? .english : .dutch
+                engine.reloadModel()
             }
         }
     }
@@ -254,9 +266,9 @@ struct OnboardingView: View {
 
     private func stepHeading(_ title: String, _ subtitle: String) -> some View {
         VStack(spacing: 6) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 19, weight: .bold))
-            Text(subtitle)
+            Text(LocalizedStringKey(subtitle))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -310,9 +322,9 @@ private struct OnboardingRow: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 13, weight: .semibold))
-                Text(description)
+                Text(LocalizedStringKey(description))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -325,7 +337,7 @@ private struct OnboardingRow: View {
                     .foregroundStyle(.green)
                     .font(.system(size: 18))
             } else {
-                Button(actionLabel, action: action)
+                Button(LocalizedStringKey(actionLabel), action: action)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .tint(.blue)
@@ -369,7 +381,7 @@ private struct OnboardingModelCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    Text(model.name)
+                    Text(LocalizedStringKey(model.name))
                         .font(.system(size: 14, weight: .semibold))
                     Text("RECOMMENDED")
                         .font(.system(size: 9, weight: .bold))
@@ -387,14 +399,14 @@ private struct OnboardingModelCard: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 } else if isDownloaded {
-                    Text("Ready — \(model.size), \(model.accuracy.lowercased()) accuracy")
+                    Text("Ready — \(model.size), \(L10n.text(model.accuracy)) accuracy")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 } else {
                     HStack(spacing: 12) {
                         Label(model.size, systemImage: "internaldrive")
-                        Label(model.speed, systemImage: "bolt.fill")
-                        Label(model.accuracy, systemImage: "target")
+                        Label(LocalizedStringKey(model.speed), systemImage: "bolt.fill")
+                        Label(LocalizedStringKey(model.accuracy), systemImage: "target")
                     }
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)

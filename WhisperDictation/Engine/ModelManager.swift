@@ -31,6 +31,11 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
 
         var id: String { fileName }
 
+        var isMultilingual: Bool { !fileName.contains(".en") && fileName != Self.vadSilero.fileName }
+        func supports(_ language: SpeechLanguage) -> Bool {
+            language == .english || isMultilingual
+        }
+
         /// The id persisted in `AppSettings.selectedModel`: the `fileName` with the
         /// "ggml-" prefix and ".bin" suffix stripped (e.g. "ggml-small.en-q5_1.bin" →
         /// "small.en-q5_1"). Single source for the derivation that was hand-inlined in
@@ -96,8 +101,25 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
             sha256: "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf"
         )
 
-        static let all: [ModelInfo] = [baseEnQ5, smallEnQ5, mediumEnQ5, baseEn, smallEn, mediumEn]
-        static let recommended: [ModelInfo] = [baseEnQ5, smallEnQ5, mediumEnQ5]
+        // Hashes verified against the publisher's Hugging Face LFS pointers.
+        static let baseQ5 = ModelInfo(
+            name: "Base Q5 (Multilingual)", fileName: "ggml-base-q5_1.bin",
+            size: "60 MB", speed: "Fastest", accuracy: "Good",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin")!,
+            isQuantized: true, sha256: "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898")
+        static let smallQ5 = ModelInfo(
+            name: "Small Q5 (Multilingual)", fileName: "ggml-small-q5_1.bin",
+            size: "190 MB", speed: "Fast", accuracy: "Better",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin")!,
+            isQuantized: true, sha256: "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb")
+        static let mediumQ5 = ModelInfo(
+            name: "Medium Q5 (Multilingual)", fileName: "ggml-medium-q5_0.bin",
+            size: "539 MB", speed: "Balanced", accuracy: "Best",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin")!,
+            isQuantized: true, sha256: "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f")
+
+        static let all: [ModelInfo] = [baseQ5, smallQ5, mediumQ5, baseEnQ5, smallEnQ5, mediumEnQ5, baseEn, smallEn, mediumEn]
+        static let recommended: [ModelInfo] = [baseQ5, smallQ5, mediumQ5, baseEnQ5, smallEnQ5, mediumEnQ5]
     }
 
     var modelsDirectory: URL {
@@ -109,10 +131,9 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
 
     func activeModelPath() -> String? {
         let selectedModel = AppSettings.shared.selectedModel
-        // Try exact match first, then contains
-        let info = ModelInfo.all.first { $0.settingsId == selectedModel }
-            ?? ModelInfo.all.first { $0.fileName.contains(selectedModel) }
-            ?? ModelInfo.smallEnQ5
+        // Never silently substitute an English-only model for Dutch or auto.
+        guard let info = ModelInfo.all.first(where: { $0.settingsId == selectedModel }),
+              info.supports(AppSettings.shared.speechLanguage) else { return nil }
         let path = modelsDirectory.appendingPathComponent(info.fileName).path
         return fileManager.fileExists(atPath: path) ? path : nil
     }
@@ -229,7 +250,7 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
         } catch {
             fputs("[ModelManager] Download failed for \(model.name): \(error)\n", stderr)
             await finishDownload(key: key, generation: generation,
-                                 error: "Couldn’t download \(model.name): \(error.localizedDescription)")
+                                 error: L10n.text("Couldn’t download %@: %@", L10n.text(model.name), error.localizedDescription))
         }
     }
 
@@ -264,9 +285,9 @@ enum ModelError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .badStatus(let code):
-            return "Server returned HTTP \(code)."
+            return L10n.text("Server returned HTTP %d.", code)
         case .checksumMismatch:
-            return "Downloaded file failed integrity check (checksum mismatch). It was discarded."
+            return L10n.text("Downloaded file failed integrity check (checksum mismatch). It was discarded.")
         }
     }
 }

@@ -41,6 +41,9 @@ jobs:
         env:
           SHA256: ${{ steps.checksum.outputs.sha }}
         with:
+          # Never publish a stable release implicitly from this experimental fork.
+          draft: true
+          prerelease: true
           files: |
             build/WhisperDictation.dmg
             build/WhisperDictation.dmg.sha256
