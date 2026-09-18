@@ -26,25 +26,30 @@ final class TextCorrector: @unchecked Sendable {
     }
 
     func correct(_ text: String, context: CorrectionContext) -> String {
-        guard AppSettings.shared.grammarCorrectionEnabled else { return text }
+        correct(text, context: context, grammar: AppSettings.shared.grammarCorrectionEnabled,
+                numbers: AppSettings.shared.numberConversionEnabled, customTerms: AppSettings.shared.customTerms)
+    }
+
+    func correct(_ text: String, context: CorrectionContext, grammar: Bool,
+                 numbers: Bool, customTerms: [String]) -> String {
+        guard grammar else { return text }
         #if DEBUG
         let startTime = CFAbsoluteTimeGetCurrent()
         #endif
 
         var result = text
-        if AppSettings.shared.numberConversionEnabled {
+        if numbers {
             result = convertWordsToNumbers(result)
         }
         result = fixAcronymsAndTerms(result)
-        result = fixCustomTerms(result)
+        result = fixCustomTerms(result, terms: customTerms)
         result = fixCapitalization(result, atSentenceStart: context.atSentenceStart)
         result = fixPunctuation(result, appendPeriod: context.appendPeriod)
 
         #if DEBUG
-        // Content-bearing: DEBUG only. Release builds (make app) never define DEBUG,
-        // so the user's dictated text is never logged in shipped binaries.
+        // Timing only, even in debug builds: dictation can contain private data.
         let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
-        print("[TextCorrector] \(String(format: "%.1f", elapsed))ms: \"\(text)\" → \"\(result)\"")
+        print("[TextCorrector] \(String(format: "%.1f", elapsed))ms")
         #endif
         return result
     }
@@ -220,8 +225,7 @@ final class TextCorrector: @unchecked Sendable {
 
     // MARK: - Pass 1.5: Custom User Terms
 
-    private func fixCustomTerms(_ text: String) -> String {
-        let terms = AppSettings.shared.customTerms
+    private func fixCustomTerms(_ text: String, terms: [String]) -> String {
         guard !terms.isEmpty else { return text }
 
         return cacheQueue.sync {

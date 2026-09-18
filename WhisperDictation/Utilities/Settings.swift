@@ -3,7 +3,17 @@ import Foundation
 final class AppSettings: ObservableObject, @unchecked Sendable {
     static let shared = AppSettings()
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        // Migrate once. Existing English preferences and vocabulary are untouched.
+        if defaults.string(forKey: Key.speechLanguage.rawValue) == nil {
+            let existing = Key.allCases.contains { defaults.object(forKey: $0.rawValue) != nil }
+            defaults.set(existing ? "en" : "nl", forKey: Key.speechLanguage.rawValue)
+            defaults.set(existing ? "en" : "nl", forKey: Key.interfaceLanguage.rawValue)
+        }
+    }
 
     // MARK: - Hotkey Mode
 
@@ -11,7 +21,8 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
 
     // MARK: - Keys
 
-    private enum Key: String {
+    private enum Key: String, CaseIterable {
+        case speechLanguage, interfaceLanguage, spokenCommandsEnabled, dutchNumberStyle
         case hotkeyKeyCode
         case hotkeyMode
         case toggleHoldDuration
@@ -29,6 +40,37 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
     }
 
     // MARK: - Properties
+
+    var speechLanguage: SpeechLanguage {
+        get { SpeechLanguage(rawValue: defaults.string(forKey: Key.speechLanguage.rawValue) ?? "en") ?? .english }
+        set {
+            defaults.set(newValue.rawValue, forKey: Key.speechLanguage.rawValue)
+            if let model = ModelManager.ModelInfo.all.first(where: { $0.settingsId == selectedModel }),
+               !model.supports(newValue) {
+                defaults.set(newValue.defaultModelID, forKey: Key.selectedModel.rawValue)
+            }
+            objectWillChange.send()
+        }
+    }
+
+    var interfaceLanguage: InterfaceLanguage {
+        get { InterfaceLanguage(rawValue: defaults.string(forKey: Key.interfaceLanguage.rawValue) ?? "en") ?? .english }
+        set { defaults.set(newValue.rawValue, forKey: Key.interfaceLanguage.rawValue); objectWillChange.send() }
+    }
+
+    var spokenCommandsEnabled: Bool {
+        get { defaults.bool(forKey: Key.spokenCommandsEnabled.rawValue) }
+        set { defaults.set(newValue, forKey: Key.spokenCommandsEnabled.rawValue); objectWillChange.send() }
+    }
+
+    var dutchNumberStyle: DutchNumberStyle {
+        get { DutchNumberStyle(rawValue: defaults.string(forKey: Key.dutchNumberStyle.rawValue) ?? "plain") ?? .plain }
+        set { defaults.set(newValue.rawValue, forKey: Key.dutchNumberStyle.rawValue); objectWillChange.send() }
+    }
+
+    private var promptKey: String {
+        speechLanguage == .english ? Key.vocabularyPrompt.rawValue : "vocabularyPrompt.\(speechLanguage.rawValue)"
+    }
 
     var hotkeyKeyCode: Int {
         get { defaults.object(forKey: Key.hotkeyKeyCode.rawValue) as? Int ?? 61 } // 61 = right Option
@@ -61,12 +103,12 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
 
     var selectedModel: String {
         get {
-            let stored = defaults.string(forKey: Key.selectedModel.rawValue) ?? "small.en"
+            let stored = defaults.string(forKey: Key.selectedModel.rawValue) ?? speechLanguage.defaultModelID
             // Fall back to the default if the stored id doesn't correspond to any
             // catalog model (see ModelInfo.settingsId). Guards against a stale id left
             // behind after the catalog changes.
             let isKnown = ModelManager.ModelInfo.all.contains { $0.settingsId == stored }
-            return isKnown ? stored : "small.en"
+            return isKnown ? stored : speechLanguage.defaultModelID
         }
         set { defaults.set(newValue, forKey: Key.selectedModel.rawValue); objectWillChange.send() }
     }
@@ -78,9 +120,9 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
 
     var vocabularyPrompt: String {
         get {
-            defaults.string(forKey: Key.vocabularyPrompt.rawValue) ?? Self.defaultVocabularyPrompt
+            defaults.string(forKey: promptKey) ?? speechLanguage.defaultPrompt
         }
-        set { defaults.set(newValue, forKey: Key.vocabularyPrompt.rawValue); objectWillChange.send() }
+        set { defaults.set(newValue, forKey: promptKey); objectWillChange.send() }
     }
 
     var launchAtLogin: Bool {
@@ -158,7 +200,7 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
 
     // MARK: - Default Vocabulary Prompt
 
-    // ~500 words — under whisper's 1024 token (~750 word) limit
+    // Legacy English vocabulary. The bridge enforces the actual model token budget.
     static let defaultVocabularyPrompt = """
         Technical software engineering discussion. \
         Languages: JavaScript, TypeScript, Python, Swift, SwiftUI, Rust, Go, Golang, \

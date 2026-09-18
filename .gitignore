@@ -37,3 +37,8 @@ docs/superpowers/
 # Environment
 .env
 .env.local
+
+# Local evaluation data and Python caches
+__pycache__/
+*.pyc
+evaluation/local/

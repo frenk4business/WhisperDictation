@@ -178,7 +178,7 @@ struct MenuBarView: View {
         }
     }
 
-    private var statusText: String {
+    private var statusText: LocalizedStringKey {
         switch engine.state {
         case .idle: engine.isModelLoaded ? "Ready — hold \(hotkeyLabel) to dictate" : "Loading model..."
         case .recording: "Listening..."
@@ -209,7 +209,7 @@ struct MenuBarView: View {
     private var modelShortName: String {
         let m = settings.selectedModel
         // "base.en-q5_1" → "Base Q5", "small.en" → "Small"
-        let base = m.split(separator: ".").first.map(String.init) ?? m
+        let base = m.split(whereSeparator: { $0 == "." || $0 == "-" }).first.map(String.init) ?? m
         let isQuantized = m.contains("q5") || m.contains("q8")
         return base.capitalized + (isQuantized ? " Q5" : "")
     }
@@ -233,7 +233,7 @@ private struct AlertRow: View {
                 Image(systemName: icon)
                     .font(.system(size: 11))
                     .foregroundStyle(color)
-                Text(text)
+                Text(LocalizedStringKey(text))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -268,7 +268,7 @@ private struct MenuButton: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(width: 16)
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 13))
                 Spacer()
                 Text("⌘\(shortcut)")

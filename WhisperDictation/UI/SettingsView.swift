@@ -68,7 +68,7 @@ struct SettingsView: View {
                 Circle()
                     .fill(engine.isModelLoaded ? .green : .orange)
                     .frame(width: 7, height: 7)
-                Text(engine.isModelLoaded ? "Ready" : "Loading...")
+                Text(LocalizedStringKey(engine.isModelLoaded ? "Ready" : "Loading..."))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -92,7 +92,7 @@ struct SettingsView: View {
     private var detailPane: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(selectedSection.rawValue)
+                Text(LocalizedStringKey(selectedSection.rawValue))
                     .font(.system(size: 20, weight: .bold))
                     .padding(.bottom, 16)
 
@@ -138,7 +138,7 @@ private struct SidebarRow: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? .primary : .secondary)
         }
@@ -191,10 +191,10 @@ private struct CardHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 13, weight: .semibold))
             if let subtitle {
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -213,6 +213,32 @@ private struct GeneralSection: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            SettingsCard(colorScheme: colorScheme) {
+                CardHeader("Language", subtitle: "Speech and interface language can be selected independently")
+                Picker("Speech language", selection: $settings.speechLanguage) {
+                    ForEach(SpeechLanguage.allCases) { language in
+                        Text(LocalizedStringKey(language.title)).tag(language)
+                    }
+                }
+                .disabled(engine.state != .idle)
+                .onChange(of: settings.speechLanguage) { _, _ in engine.reloadModel() }
+                Picker("Interface language", selection: $settings.interfaceLanguage) {
+                    ForEach(InterfaceLanguage.allCases) { language in
+                        Text(language.title).tag(language)
+                    }
+                }
+                Text("Dutch and Automatic require a multilingual model. Download the selected model in Model if needed.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                if settings.speechLanguage != .english {
+                    Toggle("Spoken Dutch punctuation commands", isOn: $settings.spokenCommandsEnabled)
+                    Text("Off by default: words like ‘punt’ can be ordinary text. Commands insert punctuation or newlines, never a send shortcut. Test newlines in a draft first.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                    Picker("Dutch number style", selection: $settings.dutchNumberStyle) {
+                        Text("5000").tag(DutchNumberStyle.plain)
+                        Text("5.000").tag(DutchNumberStyle.grouped)
+                    }
+                }
+            }
             SettingsCard(colorScheme: colorScheme) {
                 CardHeader(
                     "Hotkey",
@@ -302,7 +328,7 @@ private struct GeneralSection: View {
                         }
                     ))
                     .font(.system(size: 13))
-                    Text(liveDictationCaption)
+                    Text(LocalizedStringKey(liveDictationCaption))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -490,7 +516,7 @@ private struct ModelSection: View {
             // Recommended quantized models
             CardHeader("Recommended (Quantized)", subtitle: "Smaller, faster, near-identical accuracy")
 
-            ForEach(ModelManager.ModelInfo.recommended) { model in
+            ForEach(ModelManager.ModelInfo.recommended.filter { $0.supports(settings.speechLanguage) }) { model in
                 modelCard(model)
             }
 
@@ -535,7 +561,7 @@ private struct ModelSection: View {
             // Full precision models (collapsible)
             DisclosureGroup {
                 VStack(spacing: 10) {
-                    ForEach([ModelManager.ModelInfo.baseEn, .smallEn, .mediumEn]) { model in
+                    ForEach([ModelManager.ModelInfo.baseEn, .smallEn, .mediumEn].filter { $0.supports(settings.speechLanguage) }) { model in
                         modelCard(model)
                     }
                 }
@@ -575,7 +601,7 @@ private struct ModelSection: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
-                        Text(model.name)
+                        Text(LocalizedStringKey(model.name))
                             .font(.system(size: 13, weight: .semibold))
                         if model.isQuantized {
                             Text("Q5")
@@ -598,8 +624,8 @@ private struct ModelSection: View {
                     }
                     HStack(spacing: 12) {
                         Label(model.size, systemImage: "internaldrive")
-                        Label(model.speed, systemImage: "bolt.fill")
-                        Label(model.accuracy, systemImage: "target")
+                        Label(LocalizedStringKey(model.speed), systemImage: "bolt.fill")
+                        Label(LocalizedStringKey(model.accuracy), systemImage: "target")
                     }
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -608,7 +634,9 @@ private struct ModelSection: View {
                 Spacer()
 
                 if isDownloaded {
-                    if !isSelected {
+                    // A selected model can still be unloaded (for example, it was
+                    // downloaded after switching language). Keep activation available.
+                    if !isSelected || !engine.isModelLoaded {
                         Button("Activate") {
                             settings.selectedModel = model.settingsId
                             engine.reloadModel()
@@ -616,6 +644,7 @@ private struct ModelSection: View {
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .tint(.blue)
+                        .disabled(engine.state != .idle)
                     } else {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
@@ -710,7 +739,7 @@ private struct VocabularySection: View {
                         .foregroundStyle(.tertiary)
                     Spacer()
                     Button("Reset") {
-                        settings.vocabularyPrompt = AppSettings.defaultVocabularyPrompt
+                        settings.vocabularyPrompt = settings.speechLanguage.defaultPrompt
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -920,9 +949,9 @@ private struct PermissionCard: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.system(size: 13, weight: .semibold))
-                    Text(description)
+                    Text(LocalizedStringKey(description))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -930,7 +959,7 @@ private struct PermissionCard: View {
                 Spacer()
 
                 if !isGranted {
-                    Button(actionLabel, action: action)
+                    Button(LocalizedStringKey(actionLabel), action: action)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .tint(.blue)

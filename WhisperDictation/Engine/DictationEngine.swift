@@ -26,6 +26,9 @@ final class DictationEngine {
     private(set) var isHoldingForToggle: Bool = false
 
     private var whisperBridge: WhisperBridge?
+    private var modelGeneration = 0
+    private var loadedModelID: String?
+    private var recordingOptions: DictationOptions?
     private let audioCapture = AudioCapture()
     private let textInjector = TextInjector()
     private let soundFeedback = SoundFeedback()
@@ -97,13 +100,18 @@ final class DictationEngine {
     // MARK: - Model Loading
 
     private func loadModelAsync() {
+        modelGeneration += 1
+        let generation = modelGeneration
+        let modelID = AppSettings.shared.selectedModel
+        let language = AppSettings.shared.speechLanguage
+        let modelPath = ModelManager.shared.activeModelPath()
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             do {
-                let modelPath = ModelManager.shared.activeModelPath()
                 guard let modelPath else {
                     await MainActor.run {
-                        self.modelLoadError = "No model found. Open Settings to download a model."
+                        guard self.modelGeneration == generation else { return }
+                        self.modelLoadError = L10n.text("No model found. Open Settings to download a model.")
                     }
                     return
                 }
@@ -111,16 +119,19 @@ final class DictationEngine {
 
                 // Pre-warm GPU: JIT-compile Metal shaders with a tiny dummy inference.
                 // Async so this cooperative-pool task isn't blocked during warmup.
-                await bridge.warmup()
+                await bridge.warmup(language: language)
 
                 await MainActor.run {
+                    guard self.modelGeneration == generation else { return }
                     self.whisperBridge = bridge
+                    self.loadedModelID = modelID
                     self.isModelLoaded = true
                     self.modelLoadError = nil
                 }
             } catch {
                 await MainActor.run {
-                    self.modelLoadError = "Failed to load model: \(error.localizedDescription)"
+                    guard self.modelGeneration == generation else { return }
+                    self.modelLoadError = L10n.text("Failed to load model: %@", error.localizedDescription)
                 }
             }
         }
@@ -149,6 +160,7 @@ final class DictationEngine {
         isModelLoaded = false
         modelLoadError = nil
         whisperBridge = nil
+        loadedModelID = nil
         loadModelAsync()
     }
 
@@ -157,6 +169,7 @@ final class DictationEngine {
     private func returnToIdle() {
         state = .idle
         drainCancelFlag = nil
+        recordingOptions = nil
         if pendingModelReload { performModelReload() }
     }
 
@@ -294,9 +307,8 @@ final class DictationEngine {
 
     // MARK: - Prompt Assembly
 
-    /// Whisper's initial_prompt is capped at ~1024 tokens (~750 words). Exceeding it
-    /// triggers `whisper_tokenize: too many resulting tokens` and degrades accuracy
-    /// (see CLAUDE.md). We budget 700 words as a safe margin.
+    /// Legacy assembly budget; the bridge additionally enforces the actual token
+    /// budget using whisper_tokenize and the loaded model's text context.
     static let promptWordBudget = 700
 
     /// Builds the whisper initial_prompt from the base vocabulary prompt plus the
@@ -308,22 +320,25 @@ final class DictationEngine {
     ///   live mode so each chunk decodes with the preceding words as context. Empty
     ///   (the default) leaves the prompt byte-identical to the non-live build.
     static func buildPrompt(base: String, customTerms: [String], transcriptTail: String = "") -> String {
-        let baseWords = base.split(separator: " ")
+        let baseWords = base.split(whereSeparator: \.isWhitespace)
         let cappedBase = baseWords.count > promptWordBudget
             ? baseWords.prefix(promptWordBudget).joined(separator: " ")
             : base
 
-        let termBudget = max(0, promptWordBudget - baseWords.count)
-        let termsToAdd = Array(customTerms.prefix(termBudget))
+        var usedWords = min(baseWords.count, promptWordBudget)
+        var termsToAdd: [String] = []
+        for term in customTerms {
+            let words = term.split(whereSeparator: \.isWhitespace)
+            guard !words.isEmpty, usedWords + words.count <= promptWordBudget else { continue }
+            termsToAdd.append(term)
+            usedWords += words.count
+        }
         let withTerms = termsToAdd.isEmpty
             ? cappedBase
             : cappedBase + ", " + termsToAdd.joined(separator: ", ")
 
-        // Committed-transcript tail: budgeted by ACTUAL word count (terms above
-        // deliberately keep their historical one-unit-each accounting), capped
-        // at 50 words, appended last — closest to the decode.
-        let tailWords = transcriptTail.split(separator: " ")
-        let usedWords = min(baseWords.count, promptWordBudget) + termsToAdd.count
+        // Multiword custom terms and the tail both use their actual word count.
+        let tailWords = transcriptTail.split(whereSeparator: \.isWhitespace)
         let tailBudget = min(50, max(0, promptWordBudget - usedWords))
         guard tailBudget > 0, !tailWords.isEmpty else { return withTerms }
         return withTerms + " " + tailWords.suffix(tailBudget).joined(separator: " ")
@@ -333,6 +348,14 @@ final class DictationEngine {
 
     private func startRecording() {
         guard state == .idle, isModelLoaded else { return }
+        let options = DictationOptions(settings: .shared)
+        guard options.modelID == loadedModelID,
+              let model = ModelManager.ModelInfo.all.first(where: { $0.settingsId == options.modelID }),
+              model.supports(options.language) else {
+            transcriptionError = WhisperError.incompatibleLanguage.localizedDescription
+            return
+        }
+        recordingOptions = options
 
         transcriptionError = nil
         state = .recording
@@ -380,10 +403,8 @@ final class DictationEngine {
         state = .processing
 
         let bridge = self.whisperBridge
-        let prompt = Self.buildPrompt(
-            base: AppSettings.shared.vocabularyPrompt,
-            customTerms: AppSettings.shared.customTerms
-        )
+        guard let options = recordingOptions else { returnToIdle(); return }
+        let prompt = Self.buildPrompt(base: options.prompt, customTerms: options.customTerms)
         let injector = self.textInjector
         let feedback = self.soundFeedback
 
@@ -421,9 +442,16 @@ final class DictationEngine {
             // happens-after all writes — so @unchecked Sendable is sound.
             let collected = TranscriptCollector()
             do {
-                _ = try await bridge.transcribe(audioBuffer: audioBuffer, prompt: prompt) { segment in
-                    let corrected = TextCorrector.shared.correct(segment)
-                    // Never log transcribed content — it's the user's private dictation.
+                if options.language == .english {
+                    _ = try await bridge.transcribe(audioBuffer: audioBuffer, language: options.language, prompt: prompt) { segment in
+                        let corrected = options.correct(segment, detectedLanguage: "en", context: .standalone)
+                        injector.type(text: collected.joinAndAppend(corrected))
+                    }
+                } else {
+                    // Correct the full utterance: decoder segment boundaries must not
+                    // split Dutch compounds, decimal commas or spoken commands.
+                    let result = try await bridge.transcribe(audioBuffer: audioBuffer, language: options.language, prompt: prompt)
+                    let corrected = options.correct(result.text, detectedLanguage: result.detectedLanguage, context: .standalone)
                     injector.type(text: collected.joinAndAppend(corrected))
                 }
             } catch let error as WhisperError where error.isCancellation {
@@ -484,6 +512,7 @@ final class DictationEngine {
     /// (WhisperBridge's cached copy from its own init must not be reused).
     private func startLiveSessionIfEnabled() -> Bool {
         guard AppSettings.shared.liveDictationEnabled,
+              recordingOptions != nil,
               let vadPath = ModelManager.shared.vadModelPath(),
               let bridge = whisperBridge else { return false }
         do {
@@ -527,9 +556,11 @@ final class DictationEngine {
         let injector = self.textInjector
         let feedback = self.soundFeedback
         let collected = TranscriptCollector()
+        guard let options = recordingOptions else { return }
 
         Task.detached(priority: .userInitiated) { [weak self] in
             var surfacedError: String?
+            var canTerminate = options.language != .automatic
 
             for await item in stream {
                 if sessionFlag.isCancelled && surfacedError == nil {
@@ -543,23 +574,22 @@ final class DictationEngine {
                 guard surfacedError == nil else { continue }  // failure: drain and discard
 
                 let prompt = Self.buildPrompt(
-                    base: AppSettings.shared.vocabularyPrompt,
-                    customTerms: AppSettings.shared.customTerms,
+                    base: options.prompt,
+                    customTerms: options.customTerms,
                     transcriptTail: collected.text
                 )
                 do {
-                    _ = try await bridge.transcribe(
+                    let result = try await bridge.transcribe(
                         audioBuffer: samples,
+                        language: options.language,
                         prompt: prompt,
                         cancelFlag: sessionFlag,
                         vad: isResidual   // chunks are pre-trimmed; residual is raw
-                    ) { segment in
-                        let context = CorrectionContext(
-                            atSentenceStart: collected.atSentenceStart,
-                            appendPeriod: false   // termination is the stop-time rule
-                        )
-                        let corrected = TextCorrector.shared.correct(segment, context: context)
-                        guard !corrected.isEmpty else { return }
+                    )
+                    let context = CorrectionContext(atSentenceStart: collected.atSentenceStart, appendPeriod: false)
+                    canTerminate = options.language != .automatic || ["nl", "en"].contains(result.detectedLanguage ?? "")
+                    let corrected = options.correct(result.text, detectedLanguage: result.detectedLanguage, context: context)
+                    if !corrected.isEmpty {
                         injector.type(text: collected.joinAndAppend(corrected))
                     }
                 } catch let error as WhisperError where error.isCancellation {
@@ -572,7 +602,9 @@ final class DictationEngine {
             }
 
             // Stream closed: stop-time finish (unconditional drain + flush).
-            if surfacedError == nil, Self.needsTerminalPeriod(committed: collected.text) {
+            let appendPeriod = surfacedError == nil && !sessionFlag.isCancelled && options.grammar && canTerminate
+                && !collected.text.hasSuffix("\n") && Self.needsTerminalPeriod(committed: collected.text)
+            if appendPeriod {
                 injector.type(text: ".")
             }
             injector.flush()
@@ -584,7 +616,7 @@ final class DictationEngine {
                     self.transcriptionError = finalError
                 } else if !collected.text.isEmpty {
                     var transcript = collected.text
-                    if Self.needsTerminalPeriod(committed: transcript) { transcript += "." }
+                    if appendPeriod { transcript += "." }
                     self.lastTranscription = transcript
                     self.transcriptionError = nil
                 }
@@ -728,7 +760,7 @@ final class TranscriptCollector: @unchecked Sendable {
     /// been collected yet, or the collected text ends in terminal punctuation.
     var atSentenceStart: Bool {
         guard let last = text.last else { return true }
-        return ".!?".contains(last)
+        return ".!?\n".contains(last)
     }
 
     /// Returns `segment` as it should be typed — with a leading space when
@@ -737,7 +769,10 @@ final class TranscriptCollector: @unchecked Sendable {
     /// The separator is applied AFTER correction: the corrector trims leading
     /// whitespace, so a pre-correction separator would be eaten.
     func joinAndAppend(_ segment: String) -> String {
-        let piece = text.isEmpty ? segment : " " + segment
+        guard !segment.isEmpty else { return "" }
+        let needsSpace = !text.isEmpty && !text.hasSuffix("\n") && !segment.hasPrefix("\n")
+            && !(segment.first.map { ".,;:!?".contains($0) } ?? false)
+        let piece = needsSpace ? " " + segment : segment
         text += piece
         return piece
     }

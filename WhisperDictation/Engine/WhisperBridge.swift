@@ -50,6 +50,10 @@ private func abortCallback(_ userData: UnsafeMutableRawPointer?) -> Bool {
 }
 
 final class WhisperBridge: @unchecked Sendable {
+    struct Transcription: Sendable {
+        let text: String
+        let detectedLanguage: String?
+    }
     private let context: OpaquePointer
     private let queue = DispatchQueue(label: "com.whisperdictation.whisper", qos: .userInitiated)
     private let vadModelPath: String?
@@ -101,7 +105,7 @@ final class WhisperBridge: @unchecked Sendable {
     /// Call once after model load so the first real inference isn't slower.
     /// Async so the caller's thread (a cooperative-pool task) is released during
     /// the warmup inference instead of being blocked by `queue.sync`.
-    func warmup() async {
+    func warmup(language: SpeechLanguage = .english) async {
         await withCheckedContinuation { continuation in
             queue.async {
                 guard !self.freed else {
@@ -113,7 +117,11 @@ final class WhisperBridge: @unchecked Sendable {
                 params.n_threads = 1
                 params.single_segment = true
                 params.no_context = true
-                let langCStr = strdup("en")
+                guard language == .english || whisper_is_multilingual(self.context) != 0 else {
+                    continuation.resume()
+                    return
+                }
+                let langCStr = strdup(language.rawValue)
                 params.language = UnsafePointer(langCStr)
                 defer { free(langCStr) }
 
@@ -147,14 +155,15 @@ final class WhisperBridge: @unchecked Sendable {
     /// `vad: false` skips whisper's internal VAD for this call only.
     func transcribe(
         audioBuffer: [Float],
+        language: SpeechLanguage = .english,
         prompt: String = "",
         cancelFlag externalFlag: CancellationFlag? = nil,
         vad: Bool = true,
         onSegment: (@Sendable (String) -> Void)? = nil
-    ) async throws -> String {
+    ) async throws -> Transcription {
         let cancelFlag = externalFlag ?? CancellationFlag()
         setActiveCancelFlag(cancelFlag)
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Transcription, Error>) in
             queue.async {
                 defer { self.clearActiveCancelFlag(ifCurrent: cancelFlag) }
                 guard !self.freed else {
@@ -164,7 +173,7 @@ final class WhisperBridge: @unchecked Sendable {
                     return
                 }
                 do {
-                    let result = try self.runInference(audioBuffer: audioBuffer, prompt: prompt, vadEnabled: vad, onSegment: onSegment, cancelFlag: cancelFlag)
+                    let result = try self.runInference(audioBuffer: audioBuffer, language: language, prompt: prompt, vadEnabled: vad, onSegment: onSegment, cancelFlag: cancelFlag)
                     continuation.resume(returning: result)
                 } catch {
                     continuation.resume(throwing: error)
@@ -223,12 +232,17 @@ final class WhisperBridge: @unchecked Sendable {
     /// the former `queue.sync` closure so `transcribe` can bridge it to async.
     private func runInference(
         audioBuffer: [Float],
+        language: SpeechLanguage,
         prompt: String,
         vadEnabled: Bool,
         onSegment: (@Sendable (String) -> Void)?,
         cancelFlag: CancellationFlag
-    ) throws -> String {
+    ) throws -> Transcription {
         dispatchPrecondition(condition: .onQueue(queue))
+        guard language == .english || whisper_is_multilingual(context) != 0 else {
+            throw WhisperError.incompatibleLanguage
+        }
+        guard !cancelFlag.isCancelled else { throw WhisperError.cancelled }
         let startTime = CFAbsoluteTimeGetCurrent()
         let audioDuration = Double(audioBuffer.count) / 16000.0
 
@@ -243,15 +257,17 @@ final class WhisperBridge: @unchecked Sendable {
         }
 
         // Allocate C strings (freed in defer)
-        let langCStr = strdup("en")
-        let suppressCStr = strdup("(Thank you|Thanks for watching|Please subscribe|you)")
-        let promptCStr = prompt.isEmpty ? nil : strdup(prompt)
+        let langCStr = strdup(language.rawValue)
+        // Preserve the legacy English filter only for explicit English dictation.
+        let suppressCStr = language == .english ? strdup("(Thank you|Thanks for watching|Please subscribe|you)") : nil
         var vadPathCStr: UnsafeMutablePointer<CChar>?
 
         params.language = UnsafePointer(langCStr)
         params.translate = false
         params.suppress_nst = true
-        params.suppress_regex = UnsafePointer(suppressCStr)
+        params.suppress_regex = suppressCStr.map { UnsafePointer($0) }
+        // "auto" detects AND transcribes. detect_language=true would return after detection.
+        params.detect_language = false
         // true = each transcription is independent (prevents hallucination carry-over)
         params.no_context = true
 
@@ -281,7 +297,20 @@ final class WhisperBridge: @unchecked Sendable {
         }
 
         // Vocabulary prompt
-        params.initial_prompt = promptCStr.map { UnsafePointer($0) }
+        // The pinned decoder retains at most half the model's text context (224
+        // tokens for these models), not a guessed number of words. Tokenize here
+        // and retain the tail, where custom terms/recent speech are placed.
+        let boundedPrompt = String(prompt.prefix(32_768))
+        let required = boundedPrompt.withCString { -whisper_tokenize(context, $0, nil, 0) }
+        var promptTokens = [whisper_token](repeating: 0, count: Int(max(0, required)))
+        if !promptTokens.isEmpty {
+            let count = promptTokens.withUnsafeMutableBufferPointer { buffer in
+                boundedPrompt.withCString { whisper_tokenize(context, $0, buffer.baseAddress, Int32(buffer.count)) }
+            }
+            if count > 0 { promptTokens = Array(promptTokens.prefix(Int(count)).suffix(Int(whisper_n_text_ctx(context) / 2))) }
+            else { promptTokens = [] }
+        }
+        params.initial_prompt = nil
 
         // Streaming callback setup
         var callbackCtxPtr: Unmanaged<SegmentCallbackContext>?
@@ -303,7 +332,6 @@ final class WhisperBridge: @unchecked Sendable {
         defer {
             free(langCStr)
             free(suppressCStr)
-            if let p = promptCStr { free(p) }
             if let v = vadPathCStr { free(v) }
             callbackCtxPtr?.release()
             cancelCtxPtr.release()
@@ -312,8 +340,12 @@ final class WhisperBridge: @unchecked Sendable {
         let strategy = useBeamSearch ? "beam(5)" : "greedy"
         fputs("[WhisperBridge] \(String(format: "%.1f", audioDuration))s | \(strategy) | \(threadCount)T | streaming: \(onSegment != nil)\n", stderr)
 
-        let result = audioBuffer.withUnsafeBufferPointer { bufferPtr in
-            whisper_full(context, params, bufferPtr.baseAddress, Int32(audioBuffer.count))
+        let result = promptTokens.withUnsafeBufferPointer { tokens in
+            params.prompt_tokens = tokens.baseAddress
+            params.prompt_n_tokens = Int32(tokens.count)
+            return audioBuffer.withUnsafeBufferPointer { bufferPtr in
+                whisper_full(context, params, bufferPtr.baseAddress, Int32(audioBuffer.count))
+            }
         }
 
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
@@ -340,17 +372,15 @@ final class WhisperBridge: @unchecked Sendable {
         }
 
         let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
-        #if DEBUG
-        // Content-bearing form is DEBUG-only; release logs timing without the text.
-        fputs("[WhisperBridge] Done (\(String(format: "%.2f", elapsed))s): \"\(trimmed)\"\n", stderr)
-        #else
         fputs("[WhisperBridge] Done (\(String(format: "%.2f", elapsed))s)\n", stderr)
-        #endif
-        return trimmed
+        let languageID = whisper_full_lang_id(context)
+        let detected = languageID >= 0 ? whisper_lang_str(languageID).map { String(cString: $0) } : nil
+        return Transcription(text: trimmed, detectedLanguage: detected)
     }
 }
 
 enum WhisperError: LocalizedError {
+    case incompatibleLanguage
     case modelLoadFailed(String)
     case transcriptionFailed(code: Int32)
     case cancelled
@@ -364,12 +394,14 @@ enum WhisperError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .incompatibleLanguage:
+            return L10n.text("Dutch and automatic dictation require a multilingual model. Select one in Settings.")
         case .modelLoadFailed(let path):
-            return "Failed to load Whisper model at: \(path)"
+            return L10n.text("Failed to load Whisper model at: %@", path)
         case .transcriptionFailed(let code):
-            return "Transcription failed (whisper error \(code)). Try again or switch models in Settings."
+            return L10n.text("Transcription failed (whisper error %d). Try again or switch models in Settings.", code)
         case .cancelled:
-            return "Transcription cancelled."
+            return L10n.text("Transcription cancelled.")
         }
     }
 }

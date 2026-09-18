@@ -9,6 +9,9 @@ APP_BUNDLE := $(BUILD_DIR)/WhisperDictation.app
 # what we ship — Apple Silicon and Intel users both need to be able to run it.
 
 SWIFT_FILES := \
+	WhisperDictation/Utilities/L10n.swift \
+	WhisperDictation/Utilities/SpeechLanguage.swift \
+	WhisperDictation/Engine/DutchTextCorrector.swift \
 	WhisperDictation/Utilities/Settings.swift \
 	WhisperDictation/Utilities/KeyCodeNames.swift \
 	WhisperDictation/Utilities/AppInfo.swift \
@@ -42,7 +45,7 @@ lib/libwhisper.a:
 	./scripts/build-whisper.sh
 
 model:
-	./scripts/download-model.sh small.en
+	./scripts/download-model.sh small-q5_1
 
 define BUILD_SLICE
 xcrun swiftc \
@@ -71,6 +74,8 @@ $(BUILD_DIR)/WhisperDictation: $(BUILD_DIR)/WhisperDictation-arm64 $(BUILD_DIR)/
 app: $(BUILD_DIR)/WhisperDictation
 	@mkdir -p "$(APP_BUNDLE)/Contents/MacOS"
 	@mkdir -p "$(APP_BUNDLE)/Contents/Resources"
+	@python3 scripts/compile-localizations.py WhisperDictation/Localizable.xcstrings "$(APP_BUNDLE)/Contents/Resources"
+	@cp -R WhisperDictation/en.lproj WhisperDictation/nl.lproj "$(APP_BUNDLE)/Contents/Resources/"
 	@cp $(BUILD_DIR)/WhisperDictation "$(APP_BUNDLE)/Contents/MacOS/"
 	@sed \
 		-e 's/$$(EXECUTABLE_NAME)/WhisperDictation/g' \
